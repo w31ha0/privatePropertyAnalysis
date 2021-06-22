@@ -1,5 +1,5 @@
 import requests
-from pandas import json_normalize, concat, DataFrame, read_csv
+from pandas import json_normalize, concat, DataFrame, read_csv, set_option
 import pandas as pd
 import json as j
 import os.path
@@ -58,6 +58,7 @@ if __name__ == "__main__":
                                                                                                 'street':'first', 'project':'first', 'marketSegment':'first',
                                                                                                 'x': 'first', 'y': 'first'})
 
+    set_option('display.max_columns', 10)
     print("")
     diff = pd.concat([df_combined, df_existing]).drop_duplicates(subset=['street', 'project'], keep=False)
     if not diff.empty:
@@ -66,16 +67,13 @@ if __name__ == "__main__":
     else:
         print("No new Residences")
 
+    print("")
     diff = pd.concat([df_combined, df_existing]).drop_duplicates(subset=['street', 'project', 'transaction'], keep=False)
-    diff = diff.sort_values('project')
     if not diff.empty:
-        print("")
-        print("New Transactions:")
-        for index, row in diff.iterrows():
-            transactions = row['transaction']
-            print(row['street'] + " : " + row['project'])
-            for transaction in j.loads(transactions.replace('\'', '"')):
-                print(transaction)
+        print(diff[['street', 'project']])
+        diff = diff.groupby(['street', 'project']).agg({'transaction': lambda x: diffTransactions(x)})
+        for transaction in list(diff['transaction'].values):
+            print(transaction)
     else:
         print("No new Transactions")
 
