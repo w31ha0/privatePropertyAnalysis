@@ -32,12 +32,12 @@ def diffTransactions(transactions):
     return str(list(df_transactions.reset_index(drop=True).T.to_dict().values()))
 
 if __name__ == "__main__":
-    '''response = requests.get(
+    response = requests.get(
             'https://www.ura.gov.sg/uraDataService/insertNewToken.action',
             headers={'AccessKey': ACCESS_KEY, 'User-Agent': None})
     token = response.json()['Result']
-    print("Got token successful " + token)'''
-    token = "7RA5fRp7pwH1C74-5F2dbF2f4SZQ79bY+z27sfm4c-71a4gtkeJ@Q5P39b74-7P5ef9--JuWjs7ze4cvA42EaJ9tRaFvn74FF7Ta"
+    print("Got token successful " + token)
+    #token = "7RA5fRp7pwH1C74-5F2dbF2f4SZQ79bY+z27sfm4c-71a4gtkeJ@Q5P39b74-7P5ef9--JuWjs7ze4cvA42EaJ9tRaFvn74FF7Ta"
     batches = [1, 2, 3, 4]
     if os.path.isfile('raw.csv'):
         df_existing = read_csv('raw.csv')

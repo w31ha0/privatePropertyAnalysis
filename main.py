@@ -55,6 +55,8 @@ def yearBegan(json):
 def leaseCommencement(tenure):
     if "commencing from" in tenure:
         return int(tenure[tenure.index("commencing from") + 16:])
+    else:
+        return 0
 
 if __name__ == "__main__":
     df_properties = pd.read_csv('raw.csv')
