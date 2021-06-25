@@ -70,10 +70,11 @@ if __name__ == "__main__":
     print("")
     diff = pd.concat([df_combined, df_existing]).drop_duplicates(subset=['street', 'project', 'transaction'], keep=False)
     if not diff.empty:
-        print(diff[['street', 'project']])
-        diff = diff.groupby(['street', 'project']).agg({'transaction': lambda x: diffTransactions(x)})
-        for transaction in list(diff['transaction'].values):
-            print(transaction)
+        print("New Transactions:")
+        diff = diff.groupby(['street', 'project']).agg({'transaction': lambda x: diffTransactions(x), 'street': 'first', 'project': 'first'})
+        for index, row in diff.iterrows():
+            print(row["street"] + " : " + row["project"])
+            print(row["transaction"])
     else:
         print("No new Transactions")
 
