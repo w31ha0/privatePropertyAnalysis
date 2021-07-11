@@ -181,11 +181,7 @@ if __name__ == "__main__":
         response = requests.get(
             'https://developers.onemap.sg/commonapi/search?searchVal=' + mall + '&returnGeom=Y&getAddrDetails=Y',
             headers={'User-Agent': None})
-        try:
-            mall_json = response.json()['results']
-        except Exception as e:
-            print(e)
-            continue
+        mall_json = response.json()['results']
         if len(mall_json) > 0:
             print("Retreived " + str(mall_json))
             df = concat([df, json_normalize(mall_json)])

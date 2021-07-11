@@ -74,7 +74,7 @@ def totalLeaseYears(tenure):
     if 'yrs lease' in tenure:
         return int(tenure[:tenure.index(' yrs lease')])
     else:
-        return math.inf
+        return 999999
 
 def yearBegan(json):
     json = json.replace('\'', '"')
@@ -103,10 +103,7 @@ def distanceToNearestMrt(x, y, df_mrt):
     df_distances['distances'] = (df_mrt['X'] - x)**2 + (df_mrt['Y'] - y)**2
     df_distances['distances'] = df_distances['distances'].apply(lambda x: math.sqrt(x))
     df_max = df_distances[df_distances['distances'] == df_distances['distances'].min()]
-    try:
-        return df_max['distances'].iloc[0]
-    except Exception as e:
-        print(e)
+    return df_max['distances'].iloc[0]
 
 if __name__ == "__main__":
     log.basicConfig(level=log.INFO, format='%(asctime)s.%(msecs)03d %(levelname)s : %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
@@ -118,13 +115,12 @@ if __name__ == "__main__":
     log.info("Loaded into csv")
 
     df_properties = df_properties.fillna(0.0)
-    #df_properties = df_properties[(df_properties['x'] != 0.0) & (df_properties['y'] != 0.0)]
     df_properties = df_properties.merge(df_rentals, on=['street', 'project'], how='left')
     df_properties['initialPrice'] = df_properties['transaction'].apply(lambda df: calculate_initial_price(df))
     log.info("Done calculating initial sales price")
     df_properties['initialRental'] = df_properties['rental'].apply(lambda df: calculate_initial_rental(df))
     log.info("Done calculating initial rental")
-    df_properties['rentalYield'] = df_properties['initialRental'] / df_properties['initialPrice']
+    df_properties['rentalYield'] = (df_properties['initialRental'] / df_properties['initialPrice']) * 12
     log.info("Done calculating rental yield")
     df_properties['annualAppreciation'] = df_properties['transaction'].apply(lambda x: calculate_annual_appreciation(x))
     log.info("Done calculating annual appreciation")
@@ -172,4 +168,9 @@ if __name__ == "__main__":
     del df_properties['transaction']
     del df_properties['rental']
     del df_properties['Unnamed: 0_x']
-    df_properties.to_csv('Analysis.csv')
+    df_properties.to_csv('unfiltered.csv')
+
+    df_properties = df_properties[(df_properties['x_x'] != 0.0) & (df_properties['y_x'] != 0.0)]
+    df_properties = df_properties[(df_properties['initialRental'] != 0.0)]
+    df_properties = df_properties[df_properties['enBlock'] != True]
+    df_properties[['street', 'project', 'propertyType', 'rentalYield', 'leaseRemaining', 'noOfTransactions', 'distanceToCentral', 'distanceToNearestMall', 'distanceToNearestMrt', 'annualAppreciation']].to_csv('cleaned.csv')
