@@ -37,7 +37,8 @@ if __name__ == "__main__":
             headers={'AccessKey': ACCESS_KEY, 'User-Agent': None})
     token = response.json()['Result']
     print("Got token successful " + token)
-    #token = "7RA5fRp7pwH1C74-5F2dbF2f4SZQ79bY+z27sfm4c-71a4gtkeJ@Q5P39b74-7P5ef9--JuWjs7ze4cvA42EaJ9tRaFvn74FF7Ta"    if os.path.isfile('./developer_transactions.csv'):
+    #token = "7RA5fRp7pwH1C74-5F2dbF2f4SZQ79bY+z27sfm4c-71a4gtkeJ@Q5P39b74-7P5ef9--JuWjs7ze4cvA42EaJ9tRaFvn74FF7Ta"
+    if os.path.isfile('./developer_transactions.csv'):
         df_existing = read_csv('./developer_transactions.csv')
         df_existing = df_existing.fillna(0)
     else:

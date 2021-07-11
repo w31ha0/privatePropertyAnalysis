@@ -103,7 +103,10 @@ def distanceToNearestMrt(x, y, df_mrt):
     df_distances['distances'] = (df_mrt['X'] - x)**2 + (df_mrt['Y'] - y)**2
     df_distances['distances'] = df_distances['distances'].apply(lambda x: math.sqrt(x))
     df_max = df_distances[df_distances['distances'] == df_distances['distances'].min()]
-    return df_max['distances'].iloc[0]
+    try:
+        return df_max['distances'].iloc[0]
+    except Exception as e:
+        print(e)
 
 if __name__ == "__main__":
     log.basicConfig(level=log.INFO, format='%(asctime)s.%(msecs)03d %(levelname)s : %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
@@ -114,6 +117,8 @@ if __name__ == "__main__":
     df_rentals = pd.read_csv('../download/rentals.csv')
     log.info("Loaded into csv")
 
+    df_properties = df_properties.fillna(0.0)
+    #df_properties = df_properties[(df_properties['x'] != 0.0) & (df_properties['y'] != 0.0)]
     df_properties = df_properties.merge(df_rentals, on=['street', 'project'], how='left')
     df_properties['initialPrice'] = df_properties['transaction'].apply(lambda df: calculate_initial_price(df))
     log.info("Done calculating initial sales price")

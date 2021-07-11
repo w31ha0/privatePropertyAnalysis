@@ -7,18 +7,15 @@ import os.path
 ACCESS_KEY = "13b9f964-e8ae-410a-9447-7742275b517f"
 
 def mergeTransactions(transactions):
-    try:
-        df_transactions = DataFrame()
-        for transaction in transactions:
-            json_str = str(transaction).replace('\'', '"')
-            df_transaction = pd.DataFrame.from_dict(j.loads(json_str))
-            df_transaction = df_transaction.fillna(0)
-            df_transactions = df_transactions.append(df_transaction)
-        df_transactions = df_transactions.drop_duplicates()
-        df_transactions.sort_values(df_transactions.columns.to_list())
-        dict = list(df_transactions.reset_index(drop=True).T.to_dict().values())
-    except Exception as e:
-        print(e)
+    df_transactions = DataFrame()
+    for transaction in transactions:
+        json_str = str(transaction).replace('\'', '"')
+        df_transaction = pd.DataFrame.from_dict(j.loads(json_str))
+        df_transaction = df_transaction.fillna(0)
+        df_transactions = df_transactions.append(df_transaction)
+    df_transactions = df_transactions.drop_duplicates()
+    df_transactions.sort_values(df_transactions.columns.to_list())
+    dict = list(df_transactions.reset_index(drop=True).T.to_dict().values())
     return str(dict)
 
 def diffTransactions(transactions):
@@ -39,8 +36,8 @@ if __name__ == "__main__":
     print("Got token successful " + token)
     #token = "7RA5fRp7pwH1C74-5F2dbF2f4SZQ79bY+z27sfm4c-71a4gtkeJ@Q5P39b74-7P5ef9--JuWjs7ze4cvA42EaJ9tRaFvn74FF7Ta"
     batches = [1, 2, 3, 4]
-    if os.path.isfile('./resale_transactions.csv'):
-        df_existing = read_csv('./resale_transactions.csv')
+    if os.path.isfile('resale_transactions.csv'):
+        df_existing = read_csv('resale_transactions.csv')
         df_existing = df_existing.fillna(0)
     else:
         df_existing = DataFrame()
@@ -52,6 +49,7 @@ if __name__ == "__main__":
             headers={'AccessKey': ACCESS_KEY, 'Token': token, 'User-Agent': None})
         properties = response.json()['Result']
         df_properties = json_normalize(properties)
+        df_properties = df_properties.fillna(0)
         df_new = concat([df_new, df_properties])
 
     df_combined = df_existing.append(df_new).groupby(['project', 'street'], as_index=False).agg({'transaction': lambda x:mergeTransactions(x),
