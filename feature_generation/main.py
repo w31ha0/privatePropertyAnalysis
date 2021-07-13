@@ -34,18 +34,19 @@ def parseRentalRange(range):
     else:
         return int(range)
 
-def calculate_initial_rental(json_rentals):
+def calculate_initial_rental(json_rentals, initial_year):
+    initial_year = initial_year - 2000
     if isinstance(json_rentals, float):
         return 0 if math.isnan(json_rentals) else json_rentals
     df_rentals = pd.DataFrame.from_dict(j.loads(json_rentals.replace('\'', '"').replace('nan', '"nan"')))
     df_rentals['areaSqm'] = df_rentals['areaSqm'].apply(lambda range: range.replace('>', '').replace('<', '').replace('=', ''))
     df_rentals['areaSqm'] = df_rentals['areaSqm'].apply(lambda range: parseRentalRange(range))
     df_rentals['psm'] = df_rentals['rent'].astype('float') / df_rentals['areaSqm'].astype('float')
-    df_rentals['year'] = df_rentals['leaseDate'].apply(lambda date: date[2:])
+    df_rentals['year'] = df_rentals['leaseDate'].apply(lambda date: date[2:]).astype('int')
     df_rentals['YYDD'] = df_rentals['leaseDate'].apply(lambda date: date[2:] + date[:2])
     grouped_date_rentals = df_rentals.groupby('year')['psm'].mean().reset_index().rename(columns={'mean': 'psm', 'year': 'year'})
-    grouped_date_rentals.sort_values('year', inplace=True)
-    return int(grouped_date_rentals['psm'].iloc[0])
+    initial_psm = grouped_date_rentals[grouped_date_rentals['year'] == initial_year]['psm']
+    return int(initial_psm.iloc[0]) if len(initial_psm) > 0 else 0
 
 def en_block(json):
     json = json.replace('\'', '"')
@@ -115,10 +116,13 @@ if __name__ == "__main__":
     log.info("Loaded into csv")
 
     df_properties = df_properties.fillna(0.0)
+
     df_properties = df_properties.merge(df_rentals, on=['street', 'project'], how='left')
     df_properties['initialPrice'] = df_properties['transaction'].apply(lambda df: calculate_initial_price(df))
     log.info("Done calculating initial sales price")
-    df_properties['initialRental'] = df_properties['rental'].apply(lambda df: calculate_initial_rental(df))
+    df_properties['initialYear'] = df_properties['transaction'].apply(lambda x: yearBegan(x))
+    log.info("Done calculating initial Year")
+    df_properties['initialRental'] = df_properties.apply(lambda df: calculate_initial_rental(df['rental'], df['initialYear']), axis=1)
     log.info("Done calculating initial rental")
     df_properties['rentalYield'] = (df_properties['initialRental'] / df_properties['initialPrice']) * 12
     log.info("Done calculating rental yield")
@@ -128,8 +132,6 @@ if __name__ == "__main__":
     log.info("Done calculating enBlock")
     df_properties['propertyType'] = df_properties['transaction'].apply(lambda x: flatten(x, 'propertyType'))
     log.info("Done calculating propertyType")
-    df_properties['initialYear'] = df_properties['transaction'].apply(lambda x: yearBegan(x))
-    log.info("Done calculating initial Year")
     df_properties['leaseCommencement'] = df_properties['transaction'].apply(lambda x: leaseCommencement(flatten(x, "tenure")))
     log.info("Done calculating lease commencement")
     df_properties['totalLease'] = df_properties['transaction'].apply(lambda x: totalLeaseYears(flatten(x, 'tenure')))
