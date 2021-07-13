@@ -28,6 +28,16 @@ def calculate_initial_price(json_transactions):
     grouped_date_transactions.sort_values('year', inplace=True)
     return int(grouped_date_transactions['psm'].iloc[0])
 
+def calculate_last_price(json_transactions):
+    json = json_transactions.replace('\'', '"')
+    df_transactions = pd.DataFrame.from_dict(j.loads(json))
+    df_transactions['psm'] = df_transactions['price'].astype('float') / df_transactions['area'].astype('float')
+    df_transactions['year'] = df_transactions['contractDate'].apply(lambda date: date[2:])
+    df_transactions['YYDD'] = df_transactions['contractDate'].apply(lambda date: date[2:] + date[:2])
+    grouped_date_transactions = df_transactions.groupby('year')['psm'].mean().reset_index().rename(columns={'mean': 'psm', 'year': 'year'})
+    grouped_date_transactions.sort_values('year', inplace=True)
+    return int(grouped_date_transactions['psm'].iloc[-1])
+
 def parseRentalRange(range):
     if "-" in range:
         return (int(range.split('-')[0]) + int(range.split('-')[1])) / 2
@@ -83,6 +93,12 @@ def yearBegan(json):
     df_transactions['year'] = df_transactions['contractDate'].apply(lambda date: date[2:])
     return int(df_transactions.sort_values('year').iloc[0]['year']) + 2000
 
+def yearLast(json):
+    json = json.replace('\'', '"')
+    df_transactions = pd.DataFrame.from_dict(j.loads(json))
+    df_transactions['year'] = df_transactions['contractDate'].apply(lambda date: date[2:])
+    return int(df_transactions.sort_values('year').iloc[-1]['year']) + 2000
+
 def leaseCommencement(tenure):
     if "commencing from" in tenure:
         return int(tenure[tenure.index("commencing from") + 16:])
@@ -108,6 +124,7 @@ def distanceToNearestMrt(x, y, df_mrt):
 
 if __name__ == "__main__":
     log.basicConfig(level=log.INFO, format='%(asctime)s.%(msecs)03d %(levelname)s : %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    current_year = 2021
 
     df_properties = pd.read_csv('../download/resale_transactions.csv')
     df_mrt = pd.read_csv('../download/mrt.csv')
@@ -120,12 +137,18 @@ if __name__ == "__main__":
     df_properties = df_properties.merge(df_rentals, on=['street', 'project'], how='left')
     df_properties['initialPrice'] = df_properties['transaction'].apply(lambda df: calculate_initial_price(df))
     log.info("Done calculating initial sales price")
+    df_properties['lastPrice'] = df_properties['transaction'].apply(lambda df: calculate_last_price(df))
+    log.info("Done calculating last sales price")
     df_properties['initialYear'] = df_properties['transaction'].apply(lambda x: yearBegan(x))
     log.info("Done calculating initial Year")
     df_properties['initialRental'] = df_properties.apply(lambda df: calculate_initial_rental(df['rental'], df['initialYear']), axis=1)
     log.info("Done calculating initial rental")
+    df_properties['lastRental'] = df_properties.apply(lambda df: calculate_initial_rental(df['rental'], current_year), axis=1)
+    log.info("Done calculating last rental")
     df_properties['rentalYield'] = (df_properties['initialRental'] / df_properties['initialPrice']) * 12
     log.info("Done calculating rental yield")
+    df_properties['rentalYieldNow'] = (df_properties['lastRental'] / df_properties['lastPrice']) * 12
+    log.info("Done calculating rental yield now")
     df_properties['annualAppreciation'] = df_properties['transaction'].apply(lambda x: calculate_annual_appreciation(x))
     log.info("Done calculating annual appreciation")
     df_properties['enBlock'] = df_properties['transaction'].apply(lambda x: en_block(x))
@@ -138,6 +161,8 @@ if __name__ == "__main__":
     log.info("Done calculating total lease")
     df_properties['leaseRemaining'] = df_properties['totalLease'] - (df_properties['initialYear'] - df_properties['leaseCommencement'])
     log.info("Done calculating lease remaining")
+    df_properties['leaseRemainingNow'] = df_properties['leaseRemaining'] - (current_year - df_properties['initialYear'])
+    log.info("Done calculating lease remaining now")
     df_properties['tenure'] = df_properties['transaction'].apply(lambda x: compressTenure(flatten(x, 'tenure')))
     log.info("Done calculating tenure")
     df_properties['noOfTransactions'] = df_properties['transaction'].apply(lambda x: len(x))
@@ -174,5 +199,6 @@ if __name__ == "__main__":
 
     df_properties = df_properties[(df_properties['x_x'] != 0.0) & (df_properties['y_x'] != 0.0)]
     df_properties = df_properties[(df_properties['initialRental'] != 0.0)]
+    df_properties = df_properties[(df_properties['rentalYieldNow'] != 0.0)]
     df_properties = df_properties[df_properties['enBlock'] != True]
-    df_properties[['street', 'project', 'propertyType', 'rentalYield', 'leaseRemaining', 'noOfTransactions', 'distanceToCentral', 'distanceToNearestMall', 'distanceToNearestMrt', 'annualAppreciation']].to_csv('cleaned.csv')
+    df_properties[['street', 'project', 'propertyType', 'rentalYield', 'leaseRemaining', 'noOfTransactions', 'distanceToCentral', 'distanceToNearestMall', 'distanceToNearestMrt', 'annualAppreciation', 'rentalYieldNow', 'leaseRemainingNow']].to_csv('cleaned.csv')
