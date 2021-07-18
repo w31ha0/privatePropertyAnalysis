@@ -1,10 +1,21 @@
-from pandas import set_option
+from pandas import set_option, concat
 import pandas as pd
 import json as j
 import math
 import logging as log
 
 ACCESS_KEY = "13b9f964-e8ae-410a-9447-7742275b517f"
+
+def flatten_all(json, identifier):
+    global df_properties
+
+    json = json.replace('\'', '"')
+    df_transactions = pd.DataFrame.from_dict(j.loads(json))
+    df_transactions['psm'] = df_transactions['price'].astype('float') / df_transactions['area'].astype('float')
+    df_transactions['year'] = df_transactions['contractDate'].apply(lambda date: date[2:])
+    df_transactions['YYDD'] = df_transactions['contractDate'].apply(lambda date: date[2:] + date[:2])
+    df_transactions['identifier'] = identifier
+    df_properties = concat([df_properties, df_transactions])
 
 def calculate_annual_appreciation(json):
     json = json.replace('\'', '"')
@@ -17,6 +28,25 @@ def calculate_annual_appreciation(json):
     n_years = int(grouped_date['year'].iloc[-1]) - int(grouped_date['year'].iloc[0])
     annual_appreciation = ((grouped_date['psm'].iloc[-1] - grouped_date['psm'].iloc[0]) / grouped_date['psm'].iloc[0]) / n_years
     return annual_appreciation
+
+def calculate_highest_floor(json):
+    json = json.replace('\'', '"')
+    df_transactions = pd.DataFrame.from_dict(j.loads(json))
+    df_transactions['floorRange'] = df_transactions['floorRange'].apply(lambda floorRange: floorRange.replace('B', '-'))
+    df_transactions['floor'] = df_transactions['floorRange'].apply(lambda floorRange: int(floorRange.split('-')[1]) if len(floorRange) >= 3 else 0)
+    return df_transactions['floor'].max()
+
+def calculate_highest_floor_psf(json):
+    json = json.replace('\'', '"')
+    df_transactions = pd.DataFrame.from_dict(j.loads(json))
+    df_transactions['floorRange'] = df_transactions['floorRange'].apply(lambda floorRange: floorRange.replace('B', '-'))
+    df_transactions['floor'] = df_transactions['floorRange'].apply(lambda floorRange: int(floorRange.split('-')[1]) if len(floorRange) >= 3 else 0)
+    df_transactions = df_transactions[df_transactions['floor'] == df_transactions['floor'].max()]
+    df_transactions = df_transactions[(df_transactions['area'].astype('float') >= 74) & (df_transactions['area'].astype('float') <= 111)]
+    df_transactions['psf'] = df_transactions['price'].astype(float) / (df_transactions['area'].astype(float) * 10.764)
+    df_transactions['year'] = df_transactions['contractDate'].apply(lambda date: date[2:])
+    df_transactions = df_transactions[df_transactions['year'] == df_transactions['year'].max()]
+    return df_transactions['psf'].mean()
 
 def calculate_initial_price(json_transactions):
     json = json_transactions.replace('\'', '"')
@@ -135,6 +165,10 @@ if __name__ == "__main__":
     df_properties = df_properties.fillna(0.0)
 
     df_properties = df_properties.merge(df_rentals, on=['street', 'project'], how='left')
+    df_properties['highestFloor'] = df_properties['transaction'].apply(lambda x: calculate_highest_floor(x))
+    log.info("Done calculating highest floor")
+    df_properties['highestPsf'] = df_properties['transaction'].apply(lambda x: calculate_highest_floor_psf(x))
+    log.info("Done calculating highest floor psf")
     df_properties['initialPrice'] = df_properties['transaction'].apply(lambda df: calculate_initial_price(df))
     log.info("Done calculating initial sales price")
     df_properties['lastPrice'] = df_properties['transaction'].apply(lambda df: calculate_last_price(df))
@@ -192,13 +226,23 @@ if __name__ == "__main__":
     set_option("display.max_rows", None)
     set_option('display.max_columns', 5)
     df_properties.sort_values('annualAppreciation', ascending=False, inplace=True)
+    df_properties_all = df_properties.copy()
     del df_properties['transaction']
     del df_properties['rental']
     del df_properties['Unnamed: 0_x']
     df_properties.to_csv('unfiltered.csv')
 
-    df_properties = df_properties[(df_properties['x_x'] != 0.0) & (df_properties['y_x'] != 0.0)]
-    df_properties = df_properties[(df_properties['initialRental'] != 0.0)]
-    df_properties = df_properties[(df_properties['rentalYieldNow'] != 0.0)]
-    df_properties = df_properties[df_properties['enBlock'] != True]
-    df_properties[['street', 'project', 'propertyType', 'rentalYield', 'leaseRemaining', 'noOfTransactions', 'distanceToCentral', 'distanceToNearestMall', 'distanceToNearestMrt', 'annualAppreciation', 'rentalYieldNow', 'leaseRemainingNow']].to_csv('cleaned.csv')
+    df_properties_filtered = df_properties[(df_properties['x_x'] != 0.0) & (df_properties['y_x'] != 0.0)]
+    df_properties_filtered = df_properties_filtered[(df_properties_filtered['initialRental'] != 0.0)]
+    df_properties_filtered = df_properties_filtered[(df_properties_filtered['rentalYieldNow'] != 0.0)]
+    df_properties_filtered = df_properties_filtered[df_properties_filtered['enBlock'] != True]
+    df_properties_filtered[['street', 'project', 'propertyType', 'rentalYield', 'leaseRemaining', 'noOfTransactions', 'distanceToCentral', 'distanceToNearestMall', 'distanceToNearestMrt', 'annualAppreciation', 'rentalYieldNow', 'leaseRemainingNow', 'highestFloor']].to_csv('cleaned.csv')
+
+    df_properties_all['identifier'] = df_properties_all['street'] + ":" + df_properties_all['project']
+    df_properties_all.apply(lambda df: flatten_all(df['transaction'], df['identifier']), axis=1)
+    del df_properties_all['transaction']
+    del df_properties_all['rental']
+    del df_properties_all['Unnamed: 0_x']
+    del df_properties_all['x_x']
+    del df_properties_all['y_x']
+    df_properties_all.to_csv("flatted_transactions2.csv")
