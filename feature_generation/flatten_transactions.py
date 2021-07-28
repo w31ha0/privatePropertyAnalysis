@@ -31,7 +31,7 @@ def calculate_initial_rental(json, identifier, distanceToNearestMrt, distanceToN
     global all_transactions
 
     json = json.replace('\'', '"')
-    df_transactions = pd.DataFrame.from_dict(j.loads(json))
+    df_transactions = pd.DataFrame.from_dict(j.loads(json.replace('\'', '"').replace('"nan"', 'nan').replace('nan', '"nan"')))
     df_transactions['psm'] = df_transactions['price'].astype('float') / df_transactions['area'].astype('float')
     df_transactions['year'] = df_transactions['contractDate'].apply(lambda date: date[2:])
     df_transactions['YYDD'] = df_transactions['contractDate'].apply(lambda date: date[2:] + date[:2])
@@ -50,7 +50,7 @@ def leaseCommencement(tenure):
 
 def flatten(json, field):
     json = json.replace('\'', '"')
-    df_transactions = pd.DataFrame.from_dict(j.loads(json))
+    df_transactions = pd.DataFrame.from_dict(j.loads(json.replace('\'', '"').replace('"nan"', 'nan').replace('nan', '"nan"')))
     return str(df_transactions[field].iloc[0])
 
 if __name__ == "__main__":
@@ -71,7 +71,6 @@ if __name__ == "__main__":
     df_properties['leaseCommencement'] = df_properties['transaction'].apply(lambda x: leaseCommencement(flatten(x, "tenure")))
     log.info("Done calculating lease commencement")
     df_properties['identifier'] = df_properties['street'] + ":" + df_properties['project']
-    df_properties['sqft'] = df_properties['area'] * 10.764
     df_properties.apply(lambda df: calculate_initial_rental(df['transaction'],
                                                             df['identifier'],
                                                             df['distanceToNearestMrt'],
@@ -79,8 +78,13 @@ if __name__ == "__main__":
                                                             df['distanceToCentral'],
                                                             df['leaseCommencement']), axis=1)
     log.info("Done exploding transactions")
+    all_transactions['sqft'] = all_transactions['area'].astype('float') * 10.764
+    del all_transactions['noOfUnits']
+    del all_transactions['typeOfSale']
+    del all_transactions['contractDate']
     all_transactions.to_csv("flatted_transactions.csv")
 
+    '''
     wb = openpyxl.Workbook()
     ws = wb.active
 
@@ -89,4 +93,8 @@ if __name__ == "__main__":
         for row in reader:
             ws.append(row)
 
-    wb.save('file.xlsx')
+    ws.auto_filter.ref = "A1:P" + str(len(all_transactions))
+    ws.auto_filter.add_filter_column(len(all_transactions) - 1, [0 ])
+    ws.auto_filter.add_sort_condition("B1:B" + str(len(all_transactions)))
+    wb.save('flatted_transactions2.xlsx')
+    '''

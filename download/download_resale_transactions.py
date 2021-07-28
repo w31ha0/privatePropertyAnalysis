@@ -9,7 +9,7 @@ ACCESS_KEY = "13b9f964-e8ae-410a-9447-7742275b517f"
 def mergeTransactions(transactions):
     df_transactions = DataFrame()
     for transaction in transactions:
-        json_str = str(transaction).replace('\'', '"')
+        json_str = str(transaction).replace('\'', '"').replace('nan', '"nan"')
         df_transaction = pd.DataFrame.from_dict(j.loads(json_str))
         df_transaction = df_transaction.fillna(0)
         df_transactions = df_transactions.append(df_transaction)
@@ -21,11 +21,14 @@ def mergeTransactions(transactions):
 def diffTransactions(transactions):
     df_transactions = DataFrame()
     for transaction in transactions:
-        json_str = str(transaction).replace('\'', '"')
-        df_transaction = pd.DataFrame.from_dict(j.loads(json_str))
-        df_transaction = df_transaction.fillna(0)
-        df_transactions = df_transactions.append(df_transaction)
-    df_transactions = df_transactions.drop_duplicates(keep=False)
+        try:
+            json_str = str(transaction).replace('\'', '"').replace('"nan"', 'nan').replace('nan', '"nan"')
+            df_transaction = pd.DataFrame.from_dict(j.loads(json_str))
+            df_transaction = df_transaction.fillna(0)
+            df_transactions = df_transactions.append(df_transaction)
+        except Exception as e:
+            print(e)
+        df_transactions = df_transactions.drop_duplicates(keep=False)
     return str(list(df_transactions.reset_index(drop=True).T.to_dict().values()))
 
 if __name__ == "__main__":
