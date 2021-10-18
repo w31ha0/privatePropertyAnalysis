@@ -9,12 +9,14 @@ ACCESS_KEY = "13b9f964-e8ae-410a-9447-7742275b517f"
 def mergeTransactions(transactions):
     df_transactions = DataFrame()
     for transaction in transactions:
-        json_str = str(transaction).replace('\'', '"').replace('nan', '"nan"')
+        json_str = str(transaction).replace('\'', '"').replace('"nan"', 'nan').replace('nan', '"nan"')
         df_transaction = pd.DataFrame.from_dict(j.loads(json_str))
         df_transaction = df_transaction.fillna(0)
         df_transactions = df_transactions.append(df_transaction)
     df_transactions = df_transactions.drop_duplicates()
     df_transactions.sort_values(df_transactions.columns.to_list())
+    if 'nettPrice' in df_transactions:
+        del df_transactions['nettPrice']
     dict = list(df_transactions.reset_index(drop=True).T.to_dict().values())
     return str(dict)
 
@@ -33,11 +35,11 @@ def diffTransactions(transactions):
 
 if __name__ == "__main__":
     response = requests.get(
-            'https://www.ura.gov.sg/uraDataService/insertNewToken.action',
-            headers={'AccessKey': ACCESS_KEY, 'User-Agent': None})
+        'https://www.ura.gov.sg/uraDataService/insertNewToken.action',
+        headers={'AccessKey': ACCESS_KEY, 'User-Agent': None})
     token = response.json()['Result']
     print("Got token successful " + token)
-    #token = "7RA5fRp7pwH1C74-5F2dbF2f4SZQ79bY+z27sfm4c-71a4gtkeJ@Q5P39b74-7P5ef9--JuWjs7ze4cvA42EaJ9tRaFvn74FF7Ta"
+    #token = "4eq8fhP@-hNX6+Ab@f-Mqe47P4nAmGG74tf8173r27aq8f6f-934Q-H5f991Yb6zxNee-j7-5-G26ad14r85f266d6V2-t-J7P-Z"
     batches = [1, 2, 3, 4]
     if os.path.isfile('resale_transactions.csv'):
         df_existing = read_csv('resale_transactions.csv')
@@ -46,14 +48,21 @@ if __name__ == "__main__":
         df_existing = DataFrame()
     df_new = DataFrame()
     for batch in batches:
-        print("Fetching batch " + str(batch))
-        response = requests.get(
-            'https://www.ura.gov.sg/uraDataService/invokeUraDS?service=PMI_Resi_Transaction&batch=' + str(batch),
-            headers={'AccessKey': ACCESS_KEY, 'Token': token, 'User-Agent': None})
-        properties = response.json()['Result']
-        df_properties = json_normalize(properties)
-        df_properties = df_properties.fillna(0)
-        df_new = concat([df_new, df_properties])
+            df_properties = None
+
+            while df_properties is None:
+                try:
+                    print("Fetching batch " + str(batch))
+                    response = requests.get(
+                        'https://www.ura.gov.sg/uraDataService/invokeUraDS?service=PMI_Resi_Transaction&batch=' + str(batch),
+                        headers={'AccessKey': ACCESS_KEY, 'Token': token, 'User-Agent': 'PostmanRuntime/7.28.4'})
+                    properties = response.json()['Result']
+                    df_properties = json_normalize(properties)
+                    df_properties = df_properties.fillna(0)
+                    df_new = concat([df_new, df_properties])
+                except Exception as e:
+                    print(e)
+                    print("Retrying batch " + str(batch))
 
     df_combined = df_existing.append(df_new).groupby(['project', 'street'], as_index=False).agg({'transaction': lambda x:mergeTransactions(x),
                                                                                                 'street':'first', 'project':'first', 'marketSegment':'first',
